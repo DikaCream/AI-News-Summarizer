@@ -8,6 +8,8 @@ import {
   getAllSummaries,
   getStats,
   waitForTransaction,
+  connectWallet,
+  getChainId,
   CONTRACT_ADDRESS,
   formatAddress,
   getCategoryColor,
@@ -163,8 +165,22 @@ export default function Home() {
 
       {/* Wrong network */}
       {wallet.address && !wallet.isRightNetwork && (
-        <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-center">
-          ⚠️ Wrong network. Please switch to GenLayer StudioNet in MetaMask.
+        <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-center flex flex-col items-center gap-3">
+          <span>⚠️ Wrong network. Please switch to GenLayer StudioNet.</span>
+          <button
+            onClick={async () => {
+              try {
+                await connectWallet();
+                const newChain = await getChainId();
+                window.location.reload();
+              } catch (e) {
+                console.error(e);
+              }
+            }}
+            className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm font-medium transition"
+          >
+            Switch to GenLayer
+          </button>
         </div>
       )}
 
