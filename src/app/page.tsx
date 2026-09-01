@@ -121,6 +121,27 @@ export default function Home() {
         <p className="text-gray-400 text-lg">
           Powered by GenLayer — AI + Blockchain consensus
         </p>
+        {CONTRACT_ADDRESS && (
+          <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm">
+            <span className="text-gray-500">Contract:</span>
+            <a
+              href={`https://explorer-studio.genlayer.com/address/${CONTRACT_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 font-mono"
+            >
+              {CONTRACT_ADDRESS.slice(0, 6)}...{CONTRACT_ADDRESS.slice(-4)}
+            </a>
+            <a
+              href={`https://explorer-studio.genlayer.com/address/${CONTRACT_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gray-500 hover:text-gray-300"
+            >
+              ↗
+            </a>
+          </div>
+        )}
         {!CONTRACT_ADDRESS && (
           <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-sm">
             ⚠️ Set NEXT_PUBLIC_CONTRACT_ADDRESS in .env after deploying
