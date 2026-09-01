@@ -1,8 +1,19 @@
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
-export const CONTRACT_ADDRESS =
-  process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
+export function getContractAddress(): string {
+  if (typeof window !== "undefined") {
+    const stored = localStorage.getItem("CONTRACT_ADDRESS");
+    if (stored) return stored;
+  }
+  return process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
+}
+
+export function setContractAddress(address: string) {
+  if (typeof window !== "undefined") {
+    localStorage.setItem("CONTRACT_ADDRESS", address);
+  }
+}
 
 export const RPC_URL =
   process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api";
@@ -142,10 +153,11 @@ export function createGenLayerClient(address?: string | null) {
 // ============ Contract Functions ============
 
 export async function summarizeUrl(url: string, address: string): Promise<string> {
-  if (!CONTRACT_ADDRESS) throw new Error("Contract address not configured");
+  const contractAddr = getContractAddress();
+  if (!contractAddr) throw new Error("Contract address not configured");
   const client = createGenLayerClient(address);
   const txHash = await client.writeContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
+    address: contractAddr as `0x${string}`,
     functionName: "summarize",
     args: [url],
     value: 0n,
@@ -154,10 +166,11 @@ export async function summarizeUrl(url: string, address: string): Promise<string
 }
 
 export async function getSummary(url: string) {
-  if (!CONTRACT_ADDRESS) throw new Error("Contract address not configured");
+  const contractAddr = getContractAddress();
+  if (!contractAddr) throw new Error("Contract address not configured");
   const client = createGenLayerClient();
   const result = await client.readContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
+    address: contractAddr as `0x${string}`,
     functionName: "get_summary",
     args: [url],
   });
@@ -165,10 +178,11 @@ export async function getSummary(url: string) {
 }
 
 export async function getAllSummaries() {
-  if (!CONTRACT_ADDRESS) throw new Error("Contract address not configured");
+  const contractAddr = getContractAddress();
+  if (!contractAddr) throw new Error("Contract address not configured");
   const client = createGenLayerClient();
   const result = await client.readContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
+    address: contractAddr as `0x${string}`,
     functionName: "get_all_summaries",
     args: [],
   });
@@ -176,10 +190,11 @@ export async function getAllSummaries() {
 }
 
 export async function getStats() {
-  if (!CONTRACT_ADDRESS) throw new Error("Contract address not configured");
+  const contractAddr = getContractAddress();
+  if (!contractAddr) throw new Error("Contract address not configured");
   const client = createGenLayerClient();
   const result = await client.readContract({
-    address: CONTRACT_ADDRESS as `0x${string}`,
+    address: contractAddr as `0x${string}`,
     functionName: "get_stats",
     args: [],
   });

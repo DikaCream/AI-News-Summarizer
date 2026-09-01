@@ -10,7 +10,8 @@ import {
   waitForReceipt,
   connectWallet,
   getChainId,
-  CONTRACT_ADDRESS,
+  getContractAddress,
+  setContractAddress,
   formatAddress,
   getCategoryColor,
   getSentimentColor,
@@ -50,12 +51,18 @@ export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"summarize" | "history" | "stats">("summarize");
+  const [contractAddr, setContractAddr] = useState("");
+  const [showAddrInput, setShowAddrInput] = useState(false);
 
   useEffect(() => {
-    if (CONTRACT_ADDRESS) {
+    setContractAddr(getContractAddress());
+  }, []);
+
+  useEffect(() => {
+    if (contractAddr) {
       loadData();
     }
-  }, [CONTRACT_ADDRESS]);
+  }, [contractAddr]);
 
   const loadData = async () => {
     try {
@@ -104,6 +111,14 @@ export default function Home() {
     }
   };
 
+  const handleSetAddress = () => {
+    if (contractAddr.trim()) {
+      setContractAddress(contractAddr.trim());
+      setShowAddrInput(false);
+      window.location.reload();
+    }
+  };
+
   const getFilteredSummaries = () => {
     if (!selectedCategory) return allSummaries;
     return Object.fromEntries(
@@ -121,30 +136,58 @@ export default function Home() {
         <p className="text-gray-400 text-lg">
           Powered by GenLayer — AI + Blockchain consensus
         </p>
-        {CONTRACT_ADDRESS && (
+        {contractAddr && (
           <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm">
             <span className="text-gray-500">Contract:</span>
             <a
-              href={`https://explorer-studio.genlayer.com/address/${CONTRACT_ADDRESS}`}
+              href={`https://explorer-studio.genlayer.com/address/${contractAddr}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-blue-400 hover:text-blue-300 font-mono"
             >
-              {CONTRACT_ADDRESS.slice(0, 6)}...{CONTRACT_ADDRESS.slice(-4)}
+              {contractAddr.slice(0, 6)}...{contractAddr.slice(-4)}
             </a>
             <a
-              href={`https://explorer-studio.genlayer.com/address/${CONTRACT_ADDRESS}`}
+              href={`https://explorer-studio.genlayer.com/address/${contractAddr}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-gray-500 hover:text-gray-300"
             >
               ↗
             </a>
+            <button
+              onClick={() => setShowAddrInput(!showAddrInput)}
+              className="text-gray-500 hover:text-gray-300 text-xs"
+            >
+              edit
+            </button>
           </div>
         )}
-        {!CONTRACT_ADDRESS && (
-          <div className="mt-4 p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-sm">
-            ⚠️ Set NEXT_PUBLIC_CONTRACT_ADDRESS in .env after deploying
+        {showAddrInput && (
+          <div className="mt-3 flex gap-2 justify-center">
+            <input
+              type="text"
+              value={contractAddr}
+              onChange={(e) => setContractAddr(e.target.value)}
+              placeholder="0x..."
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white w-96 font-mono"
+            />
+            <button
+              onClick={handleSetAddress}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition"
+            >
+              Save
+            </button>
+          </div>
+        )}
+        {!contractAddr && !showAddrInput && (
+          <div className="mt-4">
+            <button
+              onClick={() => setShowAddrInput(true)}
+              className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm transition"
+            >
+              Set Contract Address
+            </button>
           </div>
         )}
       </div>
