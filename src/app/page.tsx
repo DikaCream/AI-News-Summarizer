@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
 import {
   summarizeUrl,
   getSummary,
@@ -14,6 +14,8 @@ import {
   getSentimentEmoji,
   CATEGORIES,
 } from "@/lib/genlayer-client";
+
+const GENLAYER_CHAIN_ID = 61999;
 
 interface SummaryResult {
   url: string;
@@ -35,9 +37,10 @@ interface Stats {
 }
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
+  const { switchChain } = useSwitchChain();
 
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -49,6 +52,8 @@ export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"summarize" | "history" | "stats">("summarize");
+
+  const wrongChain = isConnected && chain && chain.id !== GENLAYER_CHAIN_ID;
 
   // Load data on mount
   useEffect(() => {
@@ -70,28 +75,38 @@ export default function Home() {
     }
   };
 
+  const handleSwitchChain = async () => {
+    try {
+      await switchChain({ chainId: GENLAYER_CHAIN_ID });
+    } catch (err) {
+      console.error("Failed to switch chain:", err);
+    }
+  };
+
   const handleSummarize = async () => {
     if (!url.trim() || !address) return;
+
+    if (wrongChain) {
+      setError("Please switch to GenLayer StudioNet first");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setResult(null);
     setStatus("Sending transaction...");
 
     try {
-      // 1. Send write transaction with account
       const txHash = await summarizeUrl(url, address);
       setStatus("Transaction sent. Waiting for consensus (60-90s)...");
 
-      // 2. Wait for finalization
       await waitForTransaction(txHash);
       setStatus("Consensus reached! Fetching summary...");
 
-      // 3. Read the result
       const summary = await getSummary(url);
       setResult(summary as SummaryResult);
       setStatus("Done!");
 
-      // 4. Reload data
       await loadData();
     } catch (err: any) {
       console.error(err);
@@ -135,6 +150,14 @@ export default function Home() {
             <span className="text-sm text-gray-400">
               {address?.slice(0, 6)}...{address?.slice(-4)}
             </span>
+            {wrongChain && (
+              <button
+                onClick={handleSwitchChain}
+                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm transition"
+              >
+                Switch to GenLayer
+              </button>
+            )}
             <button
               onClick={() => disconnect()}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm transition"
@@ -151,6 +174,13 @@ export default function Home() {
           </button>
         )}
       </div>
+
+      {/* Wrong chain warning */}
+      {wrongChain && (
+        <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-center">
+          ⚠️ You are on {chain?.name || "wrong network"}. Please switch to GenLayer StudioNet (chain ID: 61999) to use this app.
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex justify-center gap-4 mb-8">
@@ -186,7 +216,7 @@ export default function Home() {
             />
             <button
               onClick={handleSummarize}
-              disabled={loading || !url.trim() || !isConnected}
+              disabled={loading || !url.trim() || !isConnected || wrongChain}
               className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition flex items-center gap-2"
             >
               {loading ? (
