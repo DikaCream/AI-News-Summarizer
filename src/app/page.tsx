@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useConnect, useDisconnect } from "wagmi";
+import { useWallet } from "@/hooks/useWallet";
 import {
   summarizeUrl,
   getSummary,
@@ -9,14 +9,12 @@ import {
   getStats,
   waitForTransaction,
   CONTRACT_ADDRESS,
+  formatAddress,
   getCategoryColor,
   getSentimentColor,
   getSentimentEmoji,
   CATEGORIES,
-} from "@/lib/genlayer-client";
-import { GENLAYER_CHAIN_PARAMS } from "./providers";
-
-const GENLAYER_CHAIN_ID = 61999;
+} from "@/lib/client";
 
 interface SummaryResult {
   url: string;
@@ -37,33 +35,8 @@ interface Stats {
   sentiment_count: Record<string, number>;
 }
 
-async function addAndSwitchChain() {
-  const ethereum = (window as any).ethereum;
-  if (!ethereum) throw new Error("No MetaMask found");
-
-  try {
-    // Try to switch first
-    await ethereum.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: GENLAYER_CHAIN_PARAMS.chainId }],
-    });
-  } catch (switchError: any) {
-    // Chain not added yet, add it
-    if (switchError.code === 4902) {
-      await ethereum.request({
-        method: "wallet_addEthereumChain",
-        params: [GENLAYER_CHAIN_PARAMS],
-      });
-    } else {
-      throw switchError;
-    }
-  }
-}
-
 export default function Home() {
-  const { address, isConnected, chain } = useAccount();
-  const { connect, connectors } = useConnect();
-  const { disconnect } = useDisconnect();
+  const wallet = useWallet();
 
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -75,8 +48,6 @@ export default function Home() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"summarize" | "history" | "stats">("summarize");
-
-  const wrongChain = isConnected && chain && chain.id !== GENLAYER_CHAIN_ID;
 
   useEffect(() => {
     if (CONTRACT_ADDRESS) {
@@ -97,30 +68,10 @@ export default function Home() {
     }
   };
 
-  const handleConnect = async () => {
-    try {
-      await addAndSwitchChain();
-      connect({ connector: connectors[0] });
-    } catch (err: any) {
-      console.error("Failed to add/switch chain:", err);
-      // Still try to connect even if chain switch fails
-      connect({ connector: connectors[0] });
-    }
-  };
-
-  const handleSwitchChain = async () => {
-    try {
-      await addAndSwitchChain();
-    } catch (err: any) {
-      console.error("Failed to switch chain:", err);
-      setError("Failed to switch chain. Please add GenLayer StudioNet manually in MetaMask.");
-    }
-  };
-
   const handleSummarize = async () => {
-    if (!url.trim() || !address) return;
+    if (!url.trim() || !wallet.address) return;
 
-    if (wrongChain) {
+    if (!wallet.isRightNetwork) {
       setError("Please switch to GenLayer StudioNet first");
       return;
     }
@@ -131,7 +82,7 @@ export default function Home() {
     setStatus("Sending transaction...");
 
     try {
-      const txHash = await summarizeUrl(url, address);
+      const txHash = await summarizeUrl(url, wallet.address);
       setStatus("Transaction sent. Waiting for consensus (60-90s)...");
 
       await waitForTransaction(txHash);
@@ -154,9 +105,7 @@ export default function Home() {
   const getFilteredSummaries = () => {
     if (!selectedCategory) return allSummaries;
     return Object.fromEntries(
-      Object.entries(allSummaries).filter(
-        ([_, s]) => s.category === selectedCategory
-      )
+      Object.entries(allSummaries).filter(([_, s]) => s.category === selectedCategory)
     );
   };
 
@@ -177,23 +126,18 @@ export default function Home() {
         )}
       </div>
 
-      {/* Wallet Connect */}
+      {/* Wallet */}
       <div className="mb-8 flex justify-center">
-        {isConnected ? (
+        {wallet.address ? (
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400">
-              {address?.slice(0, 6)}...{address?.slice(-4)}
+              {formatAddress(wallet.address)}
             </span>
-            {wrongChain && (
-              <button
-                onClick={handleSwitchChain}
-                className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg text-sm transition"
-              >
-                Switch to GenLayer
-              </button>
+            {!wallet.isRightNetwork && (
+              <span className="text-xs text-yellow-400">Wrong network</span>
             )}
             <button
-              onClick={() => disconnect()}
+              onClick={wallet.disconnect}
               className="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm transition"
             >
               Disconnect
@@ -201,18 +145,26 @@ export default function Home() {
           </div>
         ) : (
           <button
-            onClick={handleConnect}
-            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition"
+            onClick={wallet.connect}
+            disabled={wallet.busy}
+            className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 rounded-lg font-medium transition"
           >
-            Connect Wallet
+            {wallet.busy ? "Connecting..." : "Connect Wallet"}
           </button>
         )}
       </div>
 
-      {/* Wrong chain warning */}
-      {wrongChain && (
+      {/* Wallet error */}
+      {wallet.error && (
+        <div className="mb-6 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm text-center">
+          {wallet.error}
+        </div>
+      )}
+
+      {/* Wrong network */}
+      {wallet.address && !wallet.isRightNetwork && (
         <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-center">
-          ⚠️ You are on {chain?.name || "wrong network"}. Please switch to GenLayer StudioNet (chain ID: 61999).
+          ⚠️ Wrong network. Please switch to GenLayer StudioNet in MetaMask.
         </div>
       )}
 
@@ -250,7 +202,7 @@ export default function Home() {
             />
             <button
               onClick={handleSummarize}
-              disabled={loading || !url.trim() || !isConnected || wrongChain}
+              disabled={loading || !url.trim() || !wallet.address || !wallet.isRightNetwork}
               className="px-6 py-3 bg-green-600 hover:bg-green-700 disabled:bg-gray-700 disabled:cursor-not-allowed rounded-lg font-medium transition flex items-center gap-2"
             >
               {loading ? (
@@ -263,9 +215,7 @@ export default function Home() {
             </button>
           </div>
 
-          {status && (
-            <p className="mt-3 text-sm text-blue-400">{status}</p>
-          )}
+          {status && <p className="mt-3 text-sm text-blue-400">{status}</p>}
 
           {error && (
             <div className="mt-3 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">
@@ -278,12 +228,8 @@ export default function Home() {
       {/* Result */}
       {result && (
         <div className="bg-gray-900 rounded-xl p-6 border border-green-700 mb-8">
-          <h2 className="text-lg font-semibold text-green-400 mb-4">
-            ✅ Summary
-          </h2>
-          <p className="text-gray-200 text-lg leading-relaxed mb-4">
-            {result.summary}
-          </p>
+          <h2 className="text-lg font-semibold text-green-400 mb-4">✅ Summary</h2>
+          <p className="text-gray-200 text-lg leading-relaxed mb-4">{result.summary}</p>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="bg-gray-800 p-3 rounded-lg">
@@ -300,26 +246,18 @@ export default function Home() {
             </div>
             <div className="bg-gray-800 p-3 rounded-lg">
               <span className="text-xs text-gray-500 block">Words</span>
-              <span className="text-sm font-medium text-white">
-                {result.word_count.toLocaleString()}
-              </span>
+              <span className="text-sm font-medium text-white">{result.word_count.toLocaleString()}</span>
             </div>
             <div className="bg-gray-800 p-3 rounded-lg">
               <span className="text-xs text-gray-500 block">Language</span>
-              <span className="text-sm font-medium text-white">
-                {result.language}
-              </span>
+              <span className="text-sm font-medium text-white">{result.language}</span>
             </div>
           </div>
 
           {result.key_points && (
             <div className="bg-gray-800 p-4 rounded-lg mb-4">
-              <h3 className="text-sm font-medium text-gray-400 mb-2">
-                📌 Key Points
-              </h3>
-              <div className="text-sm text-gray-300 whitespace-pre-line">
-                {result.key_points}
-              </div>
+              <h3 className="text-sm font-medium text-gray-400 mb-2">📌 Key Points</h3>
+              <div className="text-sm text-gray-300 whitespace-pre-line">{result.key_points}</div>
             </div>
           )}
 
@@ -361,30 +299,20 @@ export default function Home() {
                     <a href={summary.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm truncate block mb-2">
                       {summary.url}
                     </a>
-                    <p className="text-gray-300 text-sm mb-3 line-clamp-2">
-                      {summary.summary}
-                    </p>
+                    <p className="text-gray-300 text-sm mb-3 line-clamp-2">{summary.summary}</p>
                     <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span className={`px-2 py-0.5 rounded ${getCategoryColor(summary.category)} text-white`}>
-                        {summary.category}
-                      </span>
-                      <span className={getSentimentColor(summary.sentiment)}>
-                        {getSentimentEmoji(summary.sentiment)} {summary.sentiment}
-                      </span>
+                      <span className={`px-2 py-0.5 rounded ${getCategoryColor(summary.category)} text-white`}>{summary.category}</span>
+                      <span className={getSentimentColor(summary.sentiment)}>{getSentimentEmoji(summary.sentiment)} {summary.sentiment}</span>
                       <span>{summary.word_count} words</span>
                       <span>{summary.language}</span>
                     </div>
                   </div>
-                  <span className="text-xs text-gray-600 whitespace-nowrap">
-                    {new Date(summary.created_at).toLocaleDateString()}
-                  </span>
+                  <span className="text-xs text-gray-600 whitespace-nowrap">{new Date(summary.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
             ))}
             {Object.keys(getFilteredSummaries()).length === 0 && (
-              <div className="text-center text-gray-500 py-12">
-                No summaries found. Start by summarizing a URL!
-              </div>
+              <div className="text-center text-gray-500 py-12">No summaries found. Start by summarizing a URL!</div>
             )}
           </div>
         </div>
@@ -415,9 +343,7 @@ export default function Home() {
             <div className="space-y-2">
               {Object.entries(stats.sentiment_count).map(([sent, count]) => (
                 <div key={sent} className="flex items-center justify-between">
-                  <span className={`text-sm ${getSentimentColor(sent)}`}>
-                    {getSentimentEmoji(sent)} {sent}
-                  </span>
+                  <span className={`text-sm ${getSentimentColor(sent)}`}>{getSentimentEmoji(sent)} {sent}</span>
                   <span className="text-sm font-medium text-white">{count as number}</span>
                 </div>
               ))}
