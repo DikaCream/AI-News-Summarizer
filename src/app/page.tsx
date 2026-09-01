@@ -7,7 +7,7 @@ import {
   getSummary,
   getAllSummaries,
   getStats,
-  waitForTransaction,
+  waitForReceipt,
   connectWallet,
   getChainId,
   CONTRACT_ADDRESS,
@@ -87,7 +87,7 @@ export default function Home() {
       const txHash = await summarizeUrl(url, wallet.address);
       setStatus("Transaction sent. Waiting for consensus (60-90s)...");
 
-      await waitForTransaction(txHash);
+      await waitForReceipt(txHash, 60, 5000);
       setStatus("Consensus reached! Fetching summary...");
 
       const summary = await getSummary(url);

@@ -186,25 +186,18 @@ export async function getStats() {
   return result as any;
 }
 
-export async function waitForTransaction(
+export async function waitForReceipt(
   txHash: string,
-  maxRetries = 100,
-  intervalMs = 3000,
+  retries = 40,
+  interval = 3000,
 ) {
   const client = createGenLayerClient();
-  for (let i = 0; i < maxRetries; i++) {
-    await new Promise((r) => setTimeout(r, intervalMs));
-    try {
-      const tx = await client.getTransaction({ hash: txHash as any });
-      const status = (tx as any)?.statusName || (tx as any)?.status;
-      if (status === "ACCEPTED" || status === 5 || status === "FINALIZED" || status === 7) {
-        return tx;
-      }
-    } catch (e) {
-      // keep trying
-    }
-  }
-  throw new Error("Transaction timed out");
+  return client.waitForTransactionReceipt({
+    hash: txHash,
+    status: "ACCEPTED" as any,
+    retries,
+    interval,
+  });
 }
 
 // ============ Helpers ============
