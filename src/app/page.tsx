@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi";
+import { useAccount, useConnect, useDisconnect } from "wagmi";
 import {
   summarizeUrl,
   getSummary,
@@ -14,6 +14,7 @@ import {
   getSentimentEmoji,
   CATEGORIES,
 } from "@/lib/genlayer-client";
+import { GENLAYER_CHAIN_PARAMS } from "./providers";
 
 const GENLAYER_CHAIN_ID = 61999;
 
@@ -36,11 +37,33 @@ interface Stats {
   sentiment_count: Record<string, number>;
 }
 
+async function addAndSwitchChain() {
+  const ethereum = (window as any).ethereum;
+  if (!ethereum) throw new Error("No MetaMask found");
+
+  try {
+    // Try to switch first
+    await ethereum.request({
+      method: "wallet_switchEthereumChain",
+      params: [{ chainId: GENLAYER_CHAIN_PARAMS.chainId }],
+    });
+  } catch (switchError: any) {
+    // Chain not added yet, add it
+    if (switchError.code === 4902) {
+      await ethereum.request({
+        method: "wallet_addEthereumChain",
+        params: [GENLAYER_CHAIN_PARAMS],
+      });
+    } else {
+      throw switchError;
+    }
+  }
+}
+
 export default function Home() {
   const { address, isConnected, chain } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const { switchChain } = useSwitchChain();
 
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -55,7 +78,6 @@ export default function Home() {
 
   const wrongChain = isConnected && chain && chain.id !== GENLAYER_CHAIN_ID;
 
-  // Load data on mount
   useEffect(() => {
     if (CONTRACT_ADDRESS) {
       loadData();
@@ -75,11 +97,23 @@ export default function Home() {
     }
   };
 
+  const handleConnect = async () => {
+    try {
+      await addAndSwitchChain();
+      connect({ connector: connectors[0] });
+    } catch (err: any) {
+      console.error("Failed to add/switch chain:", err);
+      // Still try to connect even if chain switch fails
+      connect({ connector: connectors[0] });
+    }
+  };
+
   const handleSwitchChain = async () => {
     try {
-      await switchChain({ chainId: GENLAYER_CHAIN_ID });
-    } catch (err) {
+      await addAndSwitchChain();
+    } catch (err: any) {
       console.error("Failed to switch chain:", err);
+      setError("Failed to switch chain. Please add GenLayer StudioNet manually in MetaMask.");
     }
   };
 
@@ -167,7 +201,7 @@ export default function Home() {
           </div>
         ) : (
           <button
-            onClick={() => connect({ connector: connectors[0] })}
+            onClick={handleConnect}
             className="px-6 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition"
           >
             Connect Wallet
@@ -178,7 +212,7 @@ export default function Home() {
       {/* Wrong chain warning */}
       {wrongChain && (
         <div className="mb-6 p-4 bg-yellow-900/30 border border-yellow-700 rounded-lg text-yellow-300 text-center">
-          ⚠️ You are on {chain?.name || "wrong network"}. Please switch to GenLayer StudioNet (chain ID: 61999) to use this app.
+          ⚠️ You are on {chain?.name || "wrong network"}. Please switch to GenLayer StudioNet (chain ID: 61999).
         </div>
       )}
 
@@ -229,12 +263,10 @@ export default function Home() {
             </button>
           </div>
 
-          {/* Status */}
           {status && (
             <p className="mt-3 text-sm text-blue-400">{status}</p>
           )}
 
-          {/* Error */}
           {error && (
             <div className="mt-3 p-3 bg-red-900/30 border border-red-700 rounded-lg text-red-300 text-sm">
               ❌ {error}
@@ -253,15 +285,10 @@ export default function Home() {
             {result.summary}
           </p>
 
-          {/* Metadata Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
             <div className="bg-gray-800 p-3 rounded-lg">
               <span className="text-xs text-gray-500 block">Category</span>
-              <span
-                className={`inline-block px-2 py-1 rounded text-xs text-white ${getCategoryColor(
-                  result.category
-                )}`}
-              >
+              <span className={`inline-block px-2 py-1 rounded text-xs text-white ${getCategoryColor(result.category)}`}>
                 {result.category}
               </span>
             </div>
@@ -285,7 +312,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Key Points */}
           {result.key_points && (
             <div className="bg-gray-800 p-4 rounded-lg mb-4">
               <h3 className="text-sm font-medium text-gray-400 mb-2">
@@ -298,12 +324,7 @@ export default function Home() {
           )}
 
           <div className="flex justify-between text-xs text-gray-500">
-            <a
-              href={result.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="hover:text-blue-400 truncate max-w-[70%]"
-            >
+            <a href={result.url} target="_blank" rel="noopener noreferrer" className="hover:text-blue-400 truncate max-w-[70%]">
               {result.url}
             </a>
             <span>{new Date(result.created_at).toLocaleString()}</span>
@@ -314,15 +335,10 @@ export default function Home() {
       {/* History Tab */}
       {activeTab === "history" && (
         <div className="mb-8">
-          {/* Category Filter */}
           <div className="flex flex-wrap gap-2 mb-6">
             <button
               onClick={() => setSelectedCategory(null)}
-              className={`px-3 py-1 rounded-full text-sm transition ${
-                !selectedCategory
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-              }`}
+              className={`px-3 py-1 rounded-full text-sm transition ${!selectedCategory ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
             >
               All
             </button>
@@ -330,43 +346,26 @@ export default function Home() {
               <button
                 key={cat}
                 onClick={() => setSelectedCategory(cat)}
-                className={`px-3 py-1 rounded-full text-sm transition ${
-                  selectedCategory === cat
-                    ? "bg-blue-600 text-white"
-                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
-                }`}
+                className={`px-3 py-1 rounded-full text-sm transition ${selectedCategory === cat ? "bg-blue-600 text-white" : "bg-gray-800 text-gray-400 hover:bg-gray-700"}`}
               >
                 {cat}
               </button>
             ))}
           </div>
 
-          {/* Summaries List */}
           <div className="space-y-4">
             {Object.entries(getFilteredSummaries()).map(([url, summary]) => (
-              <div
-                key={url}
-                className="bg-gray-900 rounded-xl p-4 border border-gray-800 hover:border-gray-700 transition"
-              >
+              <div key={url} className="bg-gray-900 rounded-xl p-4 border border-gray-800 hover:border-gray-700 transition">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <a
-                      href={summary.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 text-sm truncate block mb-2"
-                    >
+                    <a href={summary.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 text-sm truncate block mb-2">
                       {summary.url}
                     </a>
                     <p className="text-gray-300 text-sm mb-3 line-clamp-2">
                       {summary.summary}
                     </p>
                     <div className="flex items-center gap-3 text-xs text-gray-500">
-                      <span
-                        className={`px-2 py-0.5 rounded ${getCategoryColor(
-                          summary.category
-                        )} text-white`}
-                      >
+                      <span className={`px-2 py-0.5 rounded ${getCategoryColor(summary.category)} text-white`}>
                         {summary.category}
                       </span>
                       <span className={getSentimentColor(summary.sentiment)}>
@@ -394,21 +393,13 @@ export default function Home() {
       {/* Stats Tab */}
       {activeTab === "stats" && stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Total Summaries */}
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">
-              📊 Total Summaries
-            </h3>
-            <div className="text-4xl font-bold text-blue-400">
-              {stats.total_summaries}
-            </div>
+            <h3 className="text-lg font-semibold text-gray-300 mb-4">📊 Total Summaries</h3>
+            <div className="text-4xl font-bold text-blue-400">{stats.total_summaries}</div>
           </div>
 
-          {/* Categories */}
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">
-              📁 By Category
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-300 mb-4">📁 By Category</h3>
             <div className="space-y-2">
               {Object.entries(stats.categories_count).map(([cat, count]) => (
                 <div key={cat} className="flex items-center justify-between">
@@ -419,11 +410,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Sentiment */}
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">
-              😊 By Sentiment
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-300 mb-4">😊 By Sentiment</h3>
             <div className="space-y-2">
               {Object.entries(stats.sentiment_count).map(([sent, count]) => (
                 <div key={sent} className="flex items-center justify-between">
@@ -436,11 +424,8 @@ export default function Home() {
             </div>
           </div>
 
-          {/* Domains */}
           <div className="bg-gray-900 rounded-xl p-6 border border-gray-800">
-            <h3 className="text-lg font-semibold text-gray-300 mb-4">
-              🌐 By Domain
-            </h3>
+            <h3 className="text-lg font-semibold text-gray-300 mb-4">🌐 By Domain</h3>
             <div className="space-y-2 max-h-48 overflow-y-auto">
               {Object.entries(stats.urls_by_domain)
                 .sort((a, b) => (b[1] as number) - (a[1] as number))
@@ -456,18 +441,8 @@ export default function Home() {
         </div>
       )}
 
-      {/* Footer */}
       <footer className="mt-16 text-center text-gray-600 text-sm">
-        Built on{" "}
-        <a
-          href="https://genlayer.com"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="hover:text-white"
-        >
-          GenLayer
-        </a>{" "}
-        — AI-powered Intelligent Contracts
+        Built on <a href="https://genlayer.com" target="_blank" rel="noopener noreferrer" className="hover:text-white">GenLayer</a> — AI-powered Intelligent Contracts
       </footer>
     </main>
   );
