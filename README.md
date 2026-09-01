@@ -1,40 +1,38 @@
 # AI News Summarizer
 
-A decentralized news summarization tool powered by GenLayer's Intelligent Contracts. Paste any article URL, and the system fetches the content, generates an AI summary, and stores it immutably on-chain after validator consensus.
+Decentralized news summarization powered by GenLayer Intelligent Contracts. Users submit article URLs, AI generates summaries, and validators reach consensus before storing results on-chain.
 
-## What This Does
+## Overview
 
-This is a full-stack dApp that combines web scraping, LLM analysis, and blockchain consensus into a single workflow:
+This dApp combines web scraping, LLM analysis, and blockchain consensus:
 
-1. You provide a URL (news article, blog post, etc.)
-2. The智能合约 fetches the page content directly — no oracles needed
-3. An LLM analyzes the text and produces a structured summary with metadata
-4. Five validators independently verify the result and reach consensus
-5. The summary, along with category, sentiment, and key points, gets stored on-chain
+1. User submits a URL
+2. Contract fetches page content via `gl.nondet.web.render`
+3. LLM analyzes and creates a structured summary
+4. Five validators verify the result through consensus
+5. Summary is stored immutably on-chain
 
-Once stored, summaries can't be altered. Every result is backed by blockchain consensus.
+## Features
 
-## Core Features
+- AI-powered summarization using LLMs
+- On-chain consensus with 5 validators
+- Auto-categorization (Technology, Business, Science, Health, Sports, Entertainment, Politics, Other)
+- Sentiment analysis (Positive, Negative, Neutral, Mixed)
+- Language detection
+- Key point extraction
+- Submitter wallet tracking
+- Statistics dashboard
+- REST API for external integration
 
-- **AI-powered summarization** — Uses LLMs to generate concise summaries
-- **On-chain consensus** — 5 validators verify results before storage
-- **Auto-categorization** — Content tagged as Technology, Business, Science, Health, Sports, Entertainment, Politics, or Other
-- **Sentiment analysis** — Detects whether content is Positive, Negative, Neutral, or Mixed
-- **Language detection** — Identifies the source language automatically
-- **Key point extraction** — Pulls out 3-4 main takeaways from the article
-- **Submitter tracking** — Each summary is linked to the wallet that created it
-- **Statistics dashboard** — View aggregate data across all summaries
-- **REST API** — Integrate with external applications
-
-## Getting Started
+## Quick Start
 
 ### Prerequisites
 
-- Node.js 18 or later
-- GenLayer CLI installed globally (`npm install -g genlayer`)
-- A GenLayer account (free on StudioNet)
+- Node.js 18+
+- GenLayer CLI (`npm install -g genlayer`)
+- GenLayer account
 
-### Installation
+### Setup
 
 ```bash
 git clone https://github.com/DikaCream/AI-News-Summarizer.git
@@ -43,150 +41,104 @@ npm install
 cp .env.example .env
 ```
 
-### Deploying the Contract
+### Deploy Contract
 
 ```bash
 genlayer network set studionet
 genlayer deploy --contract contracts/news_summarizer.py
 ```
 
-After deployment, you'll get a contract address. Add it to your `.env` file:
+Add the contract address to `.env`:
 
 ```
-NEXT_PUBLIC_CONTRACT_ADDRESS=0xYourContractAddress
-CONTRACT_ADDRESS=0xYourContractAddress
+NEXT_PUBLIC_CONTRACT_ADDRESS=0x...
+CONTRACT_ADDRESS=0x...
 ```
 
-### Running Locally
+### Run
 
 ```bash
 npm run dev
 ```
 
-Visit `http://localhost:3000` in your browser.
+Open http://localhost:3000
 
-## How the Contract Works
+## How It Works
 
-The智能合约 (`contracts/news_summarizer.py`) is built on GenLayer, which lets smart contracts fetch live web pages and call LLMs natively. Here's the flow:
+The contract uses GenLayer's non-deterministic blocks to fetch web content and call LLMs:
 
 ```python
-# Inside the non-deterministic block:
-web_data = gl.nondet.web.render(url, mode="text")  # Fetch the page
-result = gl.nondet.exec_prompt(task)                 # Ask LLM to analyze
-return json.dumps(result)                            # Return structured JSON
+# Fetch web content
+web_data = gl.nondet.web.render(url, mode="text")
 
-# Validators compare results using the equivalence principle:
+# Ask LLM to analyze
+result = gl.nondet.exec_prompt(task, response_format="json")
+
+# Validators reach consensus
 result_json = json.loads(gl.eq_principle.strict_eq(fetch_and_analyze))
 ```
 
-The contract uses `gl.eq_principle.strict_eq()` because the LLM output is structured JSON — validators can compare exact values. For text-heavy outputs where slight wording differences are acceptable, you'd use `gl.eq_principle.prompt_comparative()` instead.
-
-### Contract Methods
+## Contract API
 
 **Write:**
 
 | Method | Description |
 |--------|-------------|
-| `summarize(url)` | Fetches, analyzes, and stores a summary |
+| `summarize(url)` | Fetch, analyze, and store a summary |
 
 **Read:**
 
 | Method | Description |
 |--------|-------------|
-| `get_summary(url)` | Retrieve a specific summary |
-| `get_all_summaries()` | Get every stored summary |
-| `get_stats()` | Aggregate counts by domain, category, sentiment |
-| `get_submitter_summaries(address)` | Summaries from a specific wallet |
-| `get_summaries_by_category(category)` | Filter by content category |
-| `get_summaries_by_sentiment(sentiment)` | Filter by detected sentiment |
-
-### Data Model
-
-Each summary stores:
-
-- `url` — Source URL
-- `summary` — AI-generated summary text
-- `category` — One of: Technology, Business, Science, Health, Sports, Entertainment, Politics, Other
-- `sentiment` — One of: Positive, Negative, Neutral, Mixed
-- `word_count` — Approximate word count of original content
-- `language` — Detected language
-- `key_points` — 3-4 bullet points of main takeaways
-- `submitter` — Wallet address that initiated the summary
-- `created_at` — Timestamp
+| `get_summary(url)` | Get a specific summary |
+| `get_all_summaries()` | Get all summaries |
+| `get_stats()` | Get aggregate statistics |
+| `get_submitter_summaries(address)` | Get summaries by wallet |
+| `get_summaries_by_category(category)` | Filter by category |
+| `get_summaries_by_sentiment(sentiment)` | Filter by sentiment |
 
 ## REST API
 
-The frontend exposes API routes for external integration.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/summarize` | POST | Summarize a URL |
+| `/api/summaries` | GET | Get summaries (supports filters) |
+| `/api/stats` | GET | Get statistics |
+| `/api/transaction` | GET | Check transaction status |
 
-### Summarize a URL
+Example:
 
 ```bash
 curl -X POST https://your-domain.com/api/summarize \
   -H "Content-Type: application/json" \
-  -d '{"url": "https://techcrunch.com/article"}'
+  -d '{"url": "https://example.com/article"}'
 ```
 
-### Get Summaries
-
-```bash
-# All summaries
-curl https://your-domain.com/api/summaries
-
-# Filter by category
-curl "https://your-domain.com/api/summaries?category=Technology"
-
-# Filter by sentiment
-curl "https://your-domain.com/api/summaries?sentiment=Positive"
-
-# Specific URL
-curl "https://your-domain.com/api/summaries?url=https://example.com/article"
-```
-
-### Get Statistics
-
-```bash
-curl https://your-domain.com/api/stats
-```
-
-### Check Transaction Status
-
-```bash
-curl "https://your-domain.com/api/transaction?hash=0x..."
-```
-
-Full API reference is in [API_DOCUMENTATION.md](API_DOCUMENTATION.md).
+Full API docs: [API_DOCUMENTATION.md](API_DOCUMENTATION.md)
 
 ## Project Structure
 
 ```
-├── contracts/
-│   └── news_summarizer.py      # The GenLayer Intelligent Contract
-├── src/
-│   ├── app/
-│   │   ├── page.tsx            # Main UI with tabs (Summarize, History, Stats)
-│   │   ├── layout.tsx          # Root layout
-│   │   ├── providers.tsx       # Wallet connection providers
-│   │   └── api/
-│   │       ├── summarize/route.ts
-│   │       ├── summaries/route.ts
-│   │       ├── stats/route.ts
-│   │       └── transaction/route.ts
-│   └── lib/
-│       └── genlayer-client.ts  # GenLayer SDK wrapper
-├── tests/
-│   └── direct/                 # In-memory unit tests
-├── deploy/
-│   └── deployScript.ts         # Deployment script
-├── API_DOCUMENTATION.md
-└── .env.example
+contracts/
+  news_summarizer.py          # GenLayer Intelligent Contract
+src/
+  app/
+    page.tsx                  # Main UI
+    api/                      # REST API routes
+  lib/
+    genlayer-client.ts        # GenLayer SDK wrapper
+tests/
+  direct/                     # Unit tests
+deploy/
+  deployScript.ts             # Deployment script
 ```
 
 ## Tech Stack
 
-- **Smart Contract**: Python on GenLayer (Intelligent Contract)
-- **Frontend**: Next.js 16, TypeScript, Tailwind CSS
-- **Blockchain**: GenLayer StudioNet (gasless testing network)
-- **SDK**: genlayer-js for contract interaction, wagmi + viem for wallet connection
+- Smart Contract: Python (GenLayer)
+- Frontend: Next.js 16, TypeScript, Tailwind CSS
+- Blockchain: GenLayer StudioNet
+- SDK: genlayer-js, wagmi, viem
 
 ## Deployment
 
@@ -203,22 +155,20 @@ genlayer deploy --contract contracts/news_summarizer.py
 vercel deploy
 ```
 
-Environment variables to set in Vercel:
+Vercel environment variables:
 
 | Variable | Value |
 |----------|-------|
 | `NEXT_PUBLIC_GENLAYER_RPC_URL` | `https://studio.genlayer.com/api` |
 | `NEXT_PUBLIC_GENLAYER_CHAIN_ID` | `61999` |
-| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Your deployed contract address |
-| `CONTRACT_ADDRESS` | Your deployed contract address |
+| `NEXT_PUBLIC_CONTRACT_ADDRESS` | Your contract address |
+| `CONTRACT_ADDRESS` | Your contract address |
 
 ## Testing
 
 ```bash
 pytest tests/direct/ -v
 ```
-
-The tests use GenLayer's direct mode, which runs contracts in-memory with mocked web and LLM calls. No Studio instance needed.
 
 ## License
 
