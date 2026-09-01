@@ -1,24 +1,25 @@
 import { createClient } from "genlayer-js";
 import { studionet } from "genlayer-js/chains";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_GENLAYER_RPC_URL || "https://studio.genlayer.com/api";
-
-export const genlayerClient = createClient({
-  chain: studionet,
-});
-
 export const CONTRACT_ADDRESS =
   process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "";
 
+export function createGenLayerClient(account: `0x${string}`) {
+  return createClient({
+    chain: studionet,
+    account,
+  });
+}
+
 // ============ Write Functions ============
 
-export async function summarizeUrl(url: string): Promise<string> {
+export async function summarizeUrl(url: string, account: `0x${string}`): Promise<string> {
   if (!CONTRACT_ADDRESS) {
     throw new Error("Contract address not configured");
   }
 
-  const txHash = await genlayerClient.writeContract({
+  const client = createGenLayerClient(account);
+  const txHash = await client.writeContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "summarize",
     args: [url],
@@ -35,7 +36,8 @@ export async function getSummary(url: string) {
     throw new Error("Contract address not configured");
   }
 
-  const result = await genlayerClient.readContract({
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
+  const result = await client.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_summary",
     args: [url],
@@ -49,7 +51,8 @@ export async function getAllSummaries() {
     throw new Error("Contract address not configured");
   }
 
-  const result = await genlayerClient.readContract({
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
+  const result = await client.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_all_summaries",
     args: [],
@@ -63,7 +66,8 @@ export async function getStats() {
     throw new Error("Contract address not configured");
   }
 
-  const result = await genlayerClient.readContract({
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
+  const result = await client.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_stats",
     args: [],
@@ -77,7 +81,8 @@ export async function getSubmitterSummaries(submitter: string) {
     throw new Error("Contract address not configured");
   }
 
-  const result = await genlayerClient.readContract({
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
+  const result = await client.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_submitter_summaries",
     args: [submitter],
@@ -91,7 +96,8 @@ export async function getSummariesByCategory(category: string) {
     throw new Error("Contract address not configured");
   }
 
-  const result = await genlayerClient.readContract({
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
+  const result = await client.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_summaries_by_category",
     args: [category],
@@ -105,7 +111,8 @@ export async function getSummariesBySentiment(sentiment: string) {
     throw new Error("Contract address not configured");
   }
 
-  const result = await genlayerClient.readContract({
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
+  const result = await client.readContract({
     address: CONTRACT_ADDRESS as `0x${string}`,
     functionName: "get_summaries_by_sentiment",
     args: [sentiment],
@@ -121,10 +128,11 @@ export async function waitForTransaction(
   maxRetries = 100,
   intervalMs = 3000
 ) {
+  const client = createGenLayerClient("0x0000000000000000000000000000000000000000");
   for (let i = 0; i < maxRetries; i++) {
     await new Promise((r) => setTimeout(r, intervalMs));
     try {
-      const tx = await genlayerClient.getTransaction({
+      const tx = await client.getTransaction({
         hash: txHash as any,
       });
       const status = (tx as any)?.statusName || (tx as any)?.status;

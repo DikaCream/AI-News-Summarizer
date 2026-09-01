@@ -71,15 +71,15 @@ export default function Home() {
   };
 
   const handleSummarize = async () => {
-    if (!url.trim()) return;
+    if (!url.trim() || !address) return;
     setLoading(true);
     setError(null);
     setResult(null);
     setStatus("Sending transaction...");
 
     try {
-      // 1. Send write transaction
-      const txHash = await summarizeUrl(url);
+      // 1. Send write transaction with account
+      const txHash = await summarizeUrl(url, address);
       setStatus("Transaction sent. Waiting for consensus (60-90s)...");
 
       // 2. Wait for finalization
