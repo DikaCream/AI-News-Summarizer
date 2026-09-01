@@ -193,7 +193,7 @@ export async function waitForReceipt(
 ) {
   const client = createGenLayerClient();
   return client.waitForTransactionReceipt({
-    hash: txHash,
+    hash: txHash as `0x${string}`,
     status: "ACCEPTED" as any,
     retries,
     interval,
